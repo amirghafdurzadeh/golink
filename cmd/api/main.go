@@ -16,10 +16,10 @@ func main() {
 
 	apiV1Mux := http.NewServeMux()
 	{
-		apiV1Mux.HandleFunc("POST /api/v1/links", handler.CreateLink)
-		apiV1Mux.HandleFunc("GET /api/v1/links/{code}", handler.GetLink)
-		apiV1Mux.HandleFunc("DELETE /api/v1/links/{code}", handler.DeleteLink)
-		apiV1Mux.HandleFunc("GET /api/v1/links/{code}/stats", handler.GetLinkStats)
+		apiV1Mux.HandleFunc("POST /links", handler.CreateLink)
+		apiV1Mux.HandleFunc("GET /links/{code}", handler.GetLink)
+		apiV1Mux.HandleFunc("DELETE /links/{code}", handler.DeleteLink)
+		apiV1Mux.HandleFunc("GET /links/{code}/stats", handler.GetLinkStats)
 	}
 
 	rootMux := http.NewServeMux()
