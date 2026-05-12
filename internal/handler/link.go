@@ -17,7 +17,7 @@ type CreateLinkResponse struct {
 	TargetURL string `json:"target_url"`
 }
 
-func CreateLink(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateLink(w http.ResponseWriter, r *http.Request) {
 	var req CreateLinkRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -57,7 +57,7 @@ type LinkResponse struct {
 	TargetURL string `json:"target_url"`
 }
 
-func GetLink(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetLink(w http.ResponseWriter, r *http.Request) {
 	code := r.PathValue("code")
 
 	resp := LinkResponse{
@@ -68,7 +68,7 @@ func GetLink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-func DeleteLink(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -77,7 +77,7 @@ type LinkStatsResponse struct {
 	Clicks int64  `json:"clicks"`
 }
 
-func GetLinkStats(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetLinkStats(w http.ResponseWriter, r *http.Request) {
 	code := r.PathValue("code")
 
 	resp := LinkStatsResponse{
