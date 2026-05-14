@@ -66,8 +66,19 @@ func main() {
 		rootMux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiKeyMiddleware.Protect(apiV1Mux)))
 	}
 
-	log.Printf("Server starting on port %s", cfg.AppPort)
-	if err := http.ListenAndServe(":"+cfg.AppPort, rootMux); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	server := &http.Server{
+		Addr:              ":" + cfg.AppPort,
+		Handler:           rootMux,
+		ReadTimeout:       5 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	log.Printf("server starting on port %s", cfg.AppPort)
+
+	if err := server.ListenAndServe(); err != nil &&
+		err != http.ErrServerClosed {
+		log.Fatalf("server failed: %v", err)
 	}
 }
