@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/amirghafdurzadeh/golink/internal/apikey"
 	"github.com/amirghafdurzadeh/golink/internal/config"
-	"github.com/amirghafdurzadeh/golink/internal/db"
-	"github.com/amirghafdurzadeh/golink/internal/handler"
-	"github.com/amirghafdurzadeh/golink/internal/middleware"
+	"github.com/amirghafdurzadeh/golink/internal/database"
+	"github.com/amirghafdurzadeh/golink/internal/health"
+	"github.com/amirghafdurzadeh/golink/internal/link"
+	"github.com/amirghafdurzadeh/golink/internal/redirect"
 )
 
 func main() {
@@ -21,27 +23,45 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	database, err := db.New(ctx, cfg.PostgresConnURL, cfg.RedisAddr, cfg.RedisPassword)
+	db, err := database.NewPostgres(ctx, cfg.PostgresConnURL)
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		log.Fatal(err)
 	}
-	defer database.Close()
+	defer db.Close()
 
-	apiKeyMiddleware := middleware.NewAPIKeyMiddleware(cfg.APIKey)
-	h := handler.New(database)
+	redisClient, err := database.NewRedis(ctx, cfg.RedisAddr, cfg.RedisPassword)
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	// repositories
+	linkRepository := link.NewRepository(db)
+
+	// services
+	linkService := link.NewService(linkRepository)
+
+	// handlers
+	healthHandler := health.NewHandler(db)
+	redirectHandler := redirect.NewHandler(db)
+	linkHandler := link.NewHandler(linkService)
+
+	// middleware
+	apiKeyMiddleware := apikey.NewMiddleware(
+		cfg.APIKey,
+	)
+
+	// routers
 	apiV1Mux := http.NewServeMux()
 	{
-		apiV1Mux.HandleFunc("POST /links", h.CreateLink)
-		apiV1Mux.HandleFunc("GET /links/{code}", h.GetLink)
-		apiV1Mux.HandleFunc("DELETE /links/{code}", h.DeleteLink)
-		apiV1Mux.HandleFunc("GET /links/{code}/stats", h.GetLinkStats)
+		apiV1Mux.HandleFunc("POST /links", linkHandler.Create)
+		apiV1Mux.HandleFunc("GET /links/{code}", linkHandler.Get)
+		apiV1Mux.HandleFunc("DELETE /links/{code}", linkHandler.Delete)
 	}
 
 	rootMux := http.NewServeMux()
 	{
-		rootMux.HandleFunc("GET /health", h.Health)
-		rootMux.HandleFunc("GET /r/{code}", h.Redirect)
+		rootMux.HandleFunc("GET /health", healthHandler.Health)
+		rootMux.HandleFunc("GET /r/{code}", redirectHandler.Redirect)
 
 		rootMux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiKeyMiddleware.Protect(apiV1Mux)))
 	}

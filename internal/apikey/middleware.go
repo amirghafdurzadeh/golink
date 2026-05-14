@@ -1,22 +1,25 @@
-package middleware
+package apikey
 
 import (
 	"net/http"
 )
 
-type APIKeyMiddleware struct {
+type Middleware interface {
+	Protect(next http.Handler) http.Handler
+}
+
+type middleware struct {
 	apiKey string
 }
 
-func NewAPIKeyMiddleware(apiKey string) *APIKeyMiddleware {
-	return &APIKeyMiddleware{
+func NewMiddleware(apiKey string) Middleware {
+	return &middleware{
 		apiKey: apiKey,
 	}
 }
 
-func (m *APIKeyMiddleware) Protect(next http.Handler) http.Handler {
+func (m *middleware) Protect(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		apiKey := r.Header.Get("X-API-Key")
 
 		if apiKey == "" {
