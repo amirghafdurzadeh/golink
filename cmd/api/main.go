@@ -29,16 +29,19 @@ func main() {
 	}
 	defer db.Close()
 
-	// redisClient, err := database.NewRedis(ctx, cfg.RedisAddr, cfg.RedisPassword)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	redisClient, err := database.NewRedis(ctx, cfg.RedisAddr, cfg.RedisPassword)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// repositories
-	linkRepository := link.NewRepository(db)
+	linkRepository := link.NewPostgresRepository(db)
+
+	// cashes
+	linkCache := link.NewRedisCache(redisClient, 24*time.Hour)
 
 	// services
-	linkService := link.NewService(linkRepository, cfg.ShortCodeLength)
+	linkService := link.NewService(linkRepository, linkCache, cfg.ShortCodeLength)
 
 	// handlers
 	healthHandler := health.NewHandler(db)

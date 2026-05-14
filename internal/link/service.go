@@ -13,12 +13,19 @@ type Service interface {
 
 type service struct {
 	repository      Repository
+	cache           Cache
 	shortCodeLength int
 }
 
-func NewService(repository Repository, shortCodeLength int) Service {
+func NewService(
+	repository Repository,
+	cache Cache,
+	shortCodeLength int,
+) Service {
+
 	return &service{
 		repository:      repository,
+		cache:           cache,
 		shortCodeLength: shortCodeLength,
 	}
 }
@@ -44,13 +51,37 @@ func (s *service) Create(ctx context.Context, customCode string, targetURL strin
 		return Link{}, err
 	}
 
+	_ = s.cache.Set(ctx, link.Code, link.TargetURL)
+
 	return link, nil
 }
 
 func (s *service) Get(ctx context.Context, code string) (Link, error) {
-	return s.repository.Get(ctx, code)
+	targetURL, err := s.cache.Get(ctx, code)
+	if err == nil {
+		return Link{
+			Code:      code,
+			TargetURL: targetURL,
+		}, nil
+	}
+
+	link, err := s.repository.Get(ctx, code)
+	if err != nil {
+		return Link{}, err
+	}
+
+	_ = s.cache.Set(ctx, link.Code, link.TargetURL)
+
+	return link, nil
 }
 
 func (s *service) Delete(ctx context.Context, code string) error {
-	return s.repository.Delete(ctx, code)
+	err := s.repository.Delete(ctx, code)
+	if err != nil {
+		return err
+	}
+
+	_ = s.cache.Delete(ctx, code)
+
+	return nil
 }
