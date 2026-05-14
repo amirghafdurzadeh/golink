@@ -12,6 +12,7 @@ type Config struct {
 	PostgresConnURL string
 	RedisAddr       string
 	RedisPassword   string
+	APIKey          string
 }
 
 func Load() (*Config, error) {
@@ -41,6 +42,7 @@ func Load() (*Config, error) {
 		PostgresConnURL: postgresConnURL,
 		RedisAddr:       redisAddr,
 		RedisPassword:   getEnv("REDIS_PASSWORD", ""),
+		APIKey:          getEnv("API_KEY", "my_secret_apikey"),
 	}, nil
 }
 

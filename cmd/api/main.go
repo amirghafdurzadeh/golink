@@ -9,6 +9,7 @@ import (
 	"github.com/amirghafdurzadeh/golink/internal/config"
 	"github.com/amirghafdurzadeh/golink/internal/db"
 	"github.com/amirghafdurzadeh/golink/internal/handler"
+	"github.com/amirghafdurzadeh/golink/internal/middleware"
 )
 
 func main() {
@@ -26,6 +27,7 @@ func main() {
 	}
 	defer database.Close()
 
+	apiKeyMiddleware := middleware.NewAPIKeyMiddleware(cfg.APIKey)
 	h := handler.New(database)
 
 	apiV1Mux := http.NewServeMux()
@@ -41,7 +43,7 @@ func main() {
 		rootMux.HandleFunc("GET /health", h.Health)
 		rootMux.HandleFunc("GET /r/{code}", h.Redirect)
 
-		rootMux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiV1Mux))
+		rootMux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiKeyMiddleware.Protect(apiV1Mux)))
 	}
 
 	log.Printf("Server starting on port %s", cfg.AppPort)
