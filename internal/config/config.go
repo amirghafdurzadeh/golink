@@ -8,15 +8,18 @@ import (
 )
 
 type Config struct {
+	Environment     string
 	AppPort         string
-	PostgresConnURL string
+	PostgresURL     string
 	RedisAddr       string
 	RedisPassword   string
 	APIKey          string
+	ShortCodeLength int
 }
 
 func Load() (*Config, error) {
-	if os.Getenv("APP_ENV") != "production" {
+	appEnv := getEnv("APP_ENV", "development")
+	if appEnv != "production" {
 		err := godotenv.Load()
 		if err != nil {
 			return nil, err
@@ -29,7 +32,7 @@ func Load() (*Config, error) {
 	postgresPass := getEnv("POSTGRES_PASSWORD", "postgres")
 	postgresDB := getEnv("POSTGRES_DB", "golink")
 
-	postgresConnURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+	postgresURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		postgresUser, postgresPass, postgresHost, postgresPort, postgresDB,
 	)
 
@@ -37,18 +40,23 @@ func Load() (*Config, error) {
 	redisPort := getEnv("REDIS_PORT", "6379")
 	redisAddr := fmt.Sprintf("%s:%s", redisHost, redisPort)
 
+	apiKey := os.Getenv("API_KEY")
+	if apiKey == "" {
+		return nil, errAPIKeyRequired
+	}
+
+	shortCodeLength, err := getEnvAsInt("SHORT_CODE_LENGTH", 6)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
+		Environment:     appEnv,
 		AppPort:         getEnv("APP_PORT", "8080"),
-		PostgresConnURL: postgresConnURL,
+		PostgresURL:     postgresURL,
 		RedisAddr:       redisAddr,
 		RedisPassword:   getEnv("REDIS_PASSWORD", ""),
-		APIKey:          getEnv("API_KEY", "my_secret_apikey"),
+		APIKey:          apiKey,
+		ShortCodeLength: shortCodeLength,
 	}, nil
-}
-
-func getEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
-	}
-	return defaultValue
 }

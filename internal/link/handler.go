@@ -1,13 +1,8 @@
 package link
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
-	"net/url"
-	"strings"
-	"time"
 
 	"github.com/amirghafdurzadeh/golink/internal/httpx"
 )
@@ -31,76 +26,72 @@ func NewHandler(service Service) Handler {
 func (h *handler) Create(w http.ResponseWriter, r *http.Request) {
 	var req CreateRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	if req.TargetURL == "" {
-		httpx.WriteError(w, http.StatusBadRequest, "target_url is required")
+	if err := req.Validate(); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	if req.BaseURL == "" {
-		httpx.WriteError(w, http.StatusBadRequest, "base_url is required")
-		return
-	}
-
-	parsedURL, err := url.ParseRequestURI(req.TargetURL)
-	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid target_url")
-		return
-	}
-
-	code := req.CustomCode
-
-	if code == "" {
-		code = generateShortCode(6)
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-
-	link := Link{
-		Code:      code,
-		TargetURL: req.TargetURL,
-		CreatedAt: time.Now(),
-	}
-
-	err = h.service.Create(ctx, link)
+	link, err := h.service.Create(r.Context(), req.CustomCode, req.TargetURL)
 	if err != nil {
-
 		if errors.Is(err, ErrCodeAlreadyExists) {
-			httpx.WriteError(w, http.StatusConflict, "custom code already exists")
+			httpx.WriteError(w, http.StatusConflict, err.Error())
 			return
 		}
 
-		httpx.WriteError(w, http.StatusInternalServerError, "failed to create link")
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	shortURL := strings.TrimRight(req.BaseURL, "/") + "/r/" + code
-
-	resp := CreateResponse{
-		Code:      code,
-		ShortURL:  shortURL,
-		TargetURL: req.TargetURL,
-	}
-
-	httpx.WriteJSON(w, http.StatusCreated, resp)
+	httpx.WriteJSON(w, http.StatusCreated, buildCreateResponse(req.BaseURL, link))
 }
 
 func (h *handler) Get(w http.ResponseWriter, r *http.Request) {
-	code := r.PathValue("code")
-
-	resp := GetResponse{
-		Code:      code,
-		TargetURL: "https://example.com",
+	code, err := getCodeFromRequest(r)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
-	httpx.WriteJSON(w, http.StatusOK, resp)
+	link, err := h.service.Get(r.Context(), code)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			httpx.WriteError(w, http.StatusNotFound, err.Error())
+			return
+		}
+
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, GetResponse{
+		Code:      link.Code,
+		TargetURL: link.TargetURL,
+	})
 }
 
 func (h *handler) Delete(w http.ResponseWriter, r *http.Request) {
+	code, err := getCodeFromRequest(r)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	err = h.service.Delete(r.Context(), code)
+	if err != nil {
+
+		if errors.Is(err, ErrNotFound) {
+			httpx.WriteError(w, http.StatusNotFound, err.Error())
+			return
+		}
+
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }

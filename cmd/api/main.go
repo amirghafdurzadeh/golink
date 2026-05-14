@@ -23,22 +23,22 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	db, err := database.NewPostgres(ctx, cfg.PostgresConnURL)
+	db, err := database.NewPostgres(ctx, cfg.PostgresURL)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
-	redisClient, err := database.NewRedis(ctx, cfg.RedisAddr, cfg.RedisPassword)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// redisClient, err := database.NewRedis(ctx, cfg.RedisAddr, cfg.RedisPassword)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// repositories
 	linkRepository := link.NewRepository(db)
 
 	// services
-	linkService := link.NewService(linkRepository)
+	linkService := link.NewService(linkRepository, cfg.ShortCodeLength)
 
 	// handlers
 	healthHandler := health.NewHandler(db)
