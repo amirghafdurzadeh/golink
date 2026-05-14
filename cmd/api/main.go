@@ -15,27 +15,29 @@ import (
 )
 
 func main() {
+	// config
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// infrastructure
+	startupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	db, err := database.NewPostgres(ctx, cfg.PostgresURL)
+	postgresPool, err := database.NewPostgres(startupCtx, cfg.PostgresURL)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer postgresPool.Close()
 
-	redisClient, err := database.NewRedis(ctx, cfg.RedisAddr, cfg.RedisPassword)
+	redisClient, err := database.NewRedis(startupCtx, cfg.RedisAddr, cfg.RedisPassword)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// repositories
-	linkRepository := link.NewPostgresRepository(db)
+	linkRepository := link.NewPostgresRepository(postgresPool)
 
 	// cashes
 	linkCache := link.NewRedisCache(redisClient, 24*time.Hour)
@@ -44,8 +46,8 @@ func main() {
 	linkService := link.NewService(linkRepository, linkCache, cfg.ShortCodeLength)
 
 	// handlers
-	healthHandler := health.NewHandler(db)
-	redirectHandler := redirect.NewHandler(db)
+	healthHandler := health.NewHandler(postgresPool)
+	redirectHandler := redirect.NewHandler(postgresPool)
 	linkHandler := link.NewHandler(linkService)
 
 	// middleware
@@ -69,6 +71,7 @@ func main() {
 		rootMux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiKeyMiddleware.Protect(apiV1Mux)))
 	}
 
+	// server
 	server := &http.Server{
 		Addr:              ":" + cfg.AppPort,
 		Handler:           rootMux,

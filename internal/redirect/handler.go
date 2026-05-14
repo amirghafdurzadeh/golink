@@ -20,6 +20,7 @@ func NewHandler(db *pgxpool.Pool) Handler {
 	}
 }
 
+// unimplemented
 func (h *handler) Redirect(w http.ResponseWriter, r *http.Request) {
 	code := r.PathValue("code")
 

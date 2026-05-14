@@ -23,6 +23,7 @@ func NewHandler(db *pgxpool.Pool) Handler {
 	}
 }
 
+// unimplemented
 func (h *handler) Health(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(
 		r.Context(),
@@ -32,7 +33,6 @@ func (h *handler) Health(w http.ResponseWriter, r *http.Request) {
 
 	err := h.db.Ping(ctx)
 	if err != nil {
-
 		httpx.WriteError(
 			w,
 			http.StatusServiceUnavailable,
@@ -41,6 +41,16 @@ func (h *handler) Health(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
+	// if err := h.redis.Ping(ctx).Err(); err != nil {
+	// 	httpx.WriteError(
+	// 		w,
+	// 		http.StatusServiceUnavailable,
+	// 		"redis unavailable",
+	// 	)
+
+	// 	return
+	// }
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"status": "ok",
