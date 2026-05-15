@@ -2,25 +2,32 @@ package redirect
 
 import (
 	"net/http"
+
+	"github.com/amirghafdurzadeh/golink/internal/link"
 )
 
 type Handler interface {
 	Redirect(w http.ResponseWriter, r *http.Request)
 }
 
-type handler struct{}
-
-func NewHandler() Handler {
-	return &handler{}
+type handler struct {
+	linkService link.Service
 }
 
-// unimplemented
+func NewHandler(linkService link.Service) Handler {
+	return &handler{
+		linkService: linkService,
+	}
+}
+
 func (h *handler) Redirect(w http.ResponseWriter, r *http.Request) {
 	code := r.PathValue("code")
 
-	_ = code
+	l, err := h.linkService.Get(r.Context(), code)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 
-	targetURL := "https://example.com"
-
-	http.Redirect(w, r, targetURL, http.StatusFound)
+	http.Redirect(w, r, l.TargetURL, http.StatusFound)
 }

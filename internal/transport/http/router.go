@@ -13,7 +13,7 @@ import (
 func newRouter(services app.Services) http.Handler {
 	// handlers
 	healthHandler := health.NewHandler(services.Health())
-	redirectHandler := redirect.NewHandler()
+	redirectHandler := redirect.NewHandler(services.Link())
 	linkHandler := link.NewHandler(services.Link())
 
 	// middleware
