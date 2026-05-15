@@ -5,4 +5,5 @@ import "errors"
 var (
 	ErrCodeAlreadyExists = errors.New("code already exists")
 	ErrNotFound          = errors.New("not found")
+	ErrRandomNumberGen   = errors.New("failed to generate random number")
 )

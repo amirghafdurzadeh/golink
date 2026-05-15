@@ -37,8 +37,13 @@ func NewService(
 }
 
 func (s *service) Create(ctx context.Context, customCode string, targetURL string) (Link, error) {
+	code, err := buildCode(customCode, s.cfg.ShortCodeLength)
+	if err != nil {
+		return Link{}, ErrRandomNumberGen
+	}
+
 	link := Link{
-		Code:      buildCode(customCode, s.cfg.ShortCodeLength),
+		Code:      code,
 		TargetURL: targetURL,
 		CreatedAt: time.Now(),
 	}
