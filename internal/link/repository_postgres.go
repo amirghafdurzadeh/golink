@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -22,6 +23,10 @@ func (r *postgresRepository) Create(ctx context.Context, link Link) error {
 	query := `INSERT INTO links (code, target_url, created_at) VALUES ($1, $2, $3)`
 	_, err := r.db.Exec(ctx, query, link.Code, link.TargetURL, link.CreatedAt)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return ErrCodeAlreadyExists
+		}
 		return err
 	}
 	return nil
@@ -53,15 +58,4 @@ func (r *postgresRepository) Delete(ctx context.Context, code string) error {
 	}
 
 	return nil
-}
-
-func (r *postgresRepository) CodeExists(ctx context.Context, code string) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM links WHERE code = $1)`
-	var exists bool
-	err := r.db.QueryRow(ctx, query, code).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-
-	return exists, nil
 }

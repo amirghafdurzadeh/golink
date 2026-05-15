@@ -48,15 +48,6 @@ func (s *service) Create(ctx context.Context, customCode string, targetURL strin
 		CreatedAt: time.Now(),
 	}
 
-	exists, err := s.repository.CodeExists(ctx, link.Code)
-	if err != nil {
-		return Link{}, err
-	}
-
-	if exists {
-		return Link{}, ErrCodeAlreadyExists
-	}
-
 	err = s.repository.Create(ctx, link)
 	if err != nil {
 		return Link{}, err
