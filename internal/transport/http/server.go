@@ -1,7 +1,8 @@
 package http
 
 import (
-	"log"
+	"context"
+	"net"
 	"net/http"
 	"time"
 
@@ -9,29 +10,31 @@ import (
 )
 
 type Server struct {
-	http *http.Server
+	httpServer *http.Server
 }
 
-func NewServer(services app.Services, addr string) *Server {
-	handler := newRooter(services)
+func NewServer(ctx context.Context, services app.Services, addr string) *Server {
+	handler := newRouter(services)
 
 	return &Server{
-		http: &http.Server{
+		httpServer: &http.Server{
 			Addr:              addr,
 			Handler:           handler,
 			ReadTimeout:       5 * time.Second,
 			ReadHeaderTimeout: 5 * time.Second,
 			WriteTimeout:      10 * time.Second,
 			IdleTimeout:       60 * time.Second,
+			BaseContext: func(_ net.Listener) context.Context {
+				return ctx
+			},
 		},
 	}
 }
 
-func (s *Server) Start() {
-	log.Printf("server starting on %s", s.http.Addr)
+func (s *Server) Start() error {
+	return s.httpServer.ListenAndServe()
+}
 
-	if err := s.http.ListenAndServe(); err != nil &&
-		err != http.ErrServerClosed {
-		log.Fatalf("server failed: %v", err)
-	}
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.httpServer.Shutdown(ctx)
 }

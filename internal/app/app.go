@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/amirghafdurzadeh/golink/internal/apikey"
@@ -16,14 +17,14 @@ import (
 type Application interface {
 	Config() *config.Config
 	Services() Services
-	Close()
+	Close() error
 }
 
 type application struct {
-	cfg         *config.Config
-	pgPool      *pgxpool.Pool
-	redisClient *redis.Client
-	services    Services
+	cfg      *config.Config
+	postgres *pgxpool.Pool
+	redis    *redis.Client
+	services Services
 }
 
 func New(ctx context.Context) (Application, error) {
@@ -34,32 +35,32 @@ func New(ctx context.Context) (Application, error) {
 	}
 
 	// infrastructure
-	pgPool, err := database.NewPostgres(ctx, cfg.PostgresURL)
+	postgres, err := database.NewPostgres(ctx, cfg.PostgresURL)
 	if err != nil {
 		return nil, err
 	}
 
-	redisClient, err := database.NewRedis(ctx, cfg.RedisAddr, cfg.RedisPassword)
+	redis, err := database.NewRedis(ctx, cfg.RedisAddr, cfg.RedisPassword)
 	if err != nil {
-		pgPool.Close()
+		postgres.Close()
 		return nil, err
 	}
 
 	// repositories
-	linkRepo := link.NewPostgresRepository(pgPool)
+	linkRepo := link.NewPostgresRepository(postgres)
 
 	// caches
-	linkCache := link.NewRedisCache(redisClient, 24*time.Hour)
+	linkCache := link.NewRedisCache(redis, 24*time.Hour)
 
 	// services
 	apikeyService := apikey.NewService(cfg.APIKey)
-	healthService := health.NewService(pgPool, redisClient)
+	healthService := health.NewService(postgres, redis)
 	linkService := link.NewService(linkRepo, linkCache, cfg.ShortCodeLength)
 
 	return &application{
-		cfg:         cfg,
-		pgPool:      pgPool,
-		redisClient: redisClient,
+		cfg:      cfg,
+		postgres: postgres,
+		redis:    redis,
 		services: NewServices(
 			apikeyService,
 			healthService,
@@ -76,7 +77,18 @@ func (a *application) Services() Services {
 	return a.services
 }
 
-func (a *application) Close() {
-	a.pgPool.Close()
-	a.redisClient.Close()
+func (a *application) Close() error {
+	var errs []error
+
+	if a.postgres != nil {
+		a.postgres.Close()
+	}
+
+	if a.redis != nil {
+		if err := a.redis.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/amirghafdurzadeh/golink/internal/transport/http/link"
 )
 
-func newRooter(services app.Services) http.Handler {
+func newRouter(services app.Services) http.Handler {
 	// handlers
 	healthHandler := health.NewHandler(services.Health())
 	redirectHandler := redirect.NewHandler()
