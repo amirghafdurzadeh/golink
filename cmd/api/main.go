@@ -8,38 +8,33 @@ import (
 
 	"github.com/amirghafdurzadeh/golink/internal/apikey"
 	"github.com/amirghafdurzadeh/golink/internal/config"
-	"github.com/amirghafdurzadeh/golink/internal/database"
 	"github.com/amirghafdurzadeh/golink/internal/health"
 	"github.com/amirghafdurzadeh/golink/internal/link"
 	"github.com/amirghafdurzadeh/golink/internal/redirect"
+	"github.com/amirghafdurzadeh/golink/internal/router"
 )
 
 func main() {
 	// config
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf("failed to load config: %v", err)
 	}
 
 	// infrastructure
 	startupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	postgresPool, err := database.NewPostgres(startupCtx, cfg.PostgresURL)
-	if err != nil {
-		log.Fatal(err)
-	}
+	postgresPool := mustPostgres(startupCtx, cfg)
 	defer postgresPool.Close()
 
-	redisClient, err := database.NewRedis(startupCtx, cfg.RedisAddr, cfg.RedisPassword)
-	if err != nil {
-		log.Fatal(err)
-	}
+	redisClient := mustRedis(startupCtx, cfg)
+	defer redisClient.Close()
 
 	// repositories
 	linkRepository := link.NewPostgresRepository(postgresPool)
 
-	// cashes
+	// caches
 	linkCache := link.NewRedisCache(redisClient, 24*time.Hour)
 
 	// services
@@ -51,25 +46,17 @@ func main() {
 	linkHandler := link.NewHandler(linkService)
 
 	// middleware
-	apiKeyMiddleware := apikey.NewMiddleware(
-		cfg.APIKey,
-	)
+	apiKeyMiddleware := apikey.NewMiddleware(cfg.APIKey)
 
 	// routers
-	apiV1Mux := http.NewServeMux()
-	{
-		apiV1Mux.HandleFunc("POST /links", linkHandler.Create)
-		apiV1Mux.HandleFunc("GET /links/{code}", linkHandler.Get)
-		apiV1Mux.HandleFunc("DELETE /links/{code}", linkHandler.Delete)
-	}
-
 	rootMux := http.NewServeMux()
-	{
-		rootMux.HandleFunc("GET /health", healthHandler.Health)
-		rootMux.HandleFunc("GET /r/{code}", redirectHandler.Redirect)
-
-		rootMux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiKeyMiddleware.Protect(apiV1Mux)))
-	}
+	router.RegisterRoutes(
+		rootMux,
+		linkHandler,
+		redirectHandler,
+		healthHandler,
+		apiKeyMiddleware,
+	)
 
 	// server
 	server := &http.Server{
