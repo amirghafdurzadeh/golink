@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/amirghafdurzadeh/golink/internal/apikey"
@@ -21,10 +22,11 @@ type Application interface {
 }
 
 type application struct {
-	cfg      *config.Config
-	postgres *pgxpool.Pool
-	redis    *redis.Client
-	services Services
+	closeOnce sync.Once
+	cfg       *config.Config
+	postgres  *pgxpool.Pool
+	redis     *redis.Client
+	services  Services
 }
 
 func New(ctx context.Context) (Application, error) {
@@ -80,15 +82,17 @@ func (a *application) Services() Services {
 func (a *application) Close() error {
 	var errs []error
 
-	if a.postgres != nil {
-		a.postgres.Close()
-	}
-
-	if a.redis != nil {
-		if err := a.redis.Close(); err != nil {
-			errs = append(errs, err)
+	a.closeOnce.Do(func() {
+		if a.postgres != nil {
+			a.postgres.Close()
 		}
-	}
+
+		if a.redis != nil {
+			if err := a.redis.Close(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	})
 
 	return errors.Join(errs...)
 }

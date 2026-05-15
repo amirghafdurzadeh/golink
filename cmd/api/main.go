@@ -14,19 +14,32 @@ import (
 	transporthttp "github.com/amirghafdurzadeh/golink/internal/transport/http"
 )
 
+const shutdownTimeout = 10 * time.Second
+
 func main() {
-	startupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	application, err := app.New(startupCtx)
-	if err != nil {
-		log.Fatalf("failed to build app: %v", err)
-	}
-	defer application.Close()
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	application, err := buildApplication(ctx)
+	if err != nil {
+		log.Fatalf("failed to build app: %v", err)
+	}
+
+	if err := run(ctx, application); err != nil {
+		log.Fatalf("application error: %v", err)
+	}
+
+	log.Println("application stopped")
+}
+
+func buildApplication(ctx context.Context) (app.Application, error) {
+	startupCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
+	defer cancel()
+
+	return app.New(startupCtx)
+}
+
+func run(ctx context.Context, application app.Application) error {
 	httpServer := transporthttp.NewServer(
 		ctx,
 		application.Services(),
@@ -34,30 +47,41 @@ func main() {
 	)
 
 	errCh := make(chan error, 1)
+
 	go func() {
-		log.Printf("http server started on :%s", application.Config().HTTPPort)
-		if err := httpServer.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Printf(
+			"http server started on :%s",
+			application.Config().HTTPPort,
+		)
+
+		if err := httpServer.Start(); err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()
 
 	select {
 	case err := <-errCh:
-		log.Fatalf("http server failed: %v", err)
+		return err
+
 	case <-ctx.Done():
 		log.Println("shutdown signal received")
 	}
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
+	return shutdown(application, httpServer)
+}
 
-	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+func shutdown(application app.Application, httpServer *transporthttp.Server) error {
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Printf("http shutdown failed: %v", err)
 	}
 
 	if err := application.Close(); err != nil {
-		log.Printf("app close failed: %v", err)
+		return err
 	}
 
-	log.Println("application stopped")
+	return nil
 }
