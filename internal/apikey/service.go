@@ -1,6 +1,9 @@
 package apikey
 
-import "errors"
+import (
+	"crypto/subtle"
+	"errors"
+)
 
 var (
 	ErrInvalidAPIKey = errors.New("invalid api key")
@@ -25,7 +28,7 @@ func (s *service) Validate(apiKey string) error {
 		return ErrInvalidAPIKey
 	}
 
-	if apiKey != s.expectedKey {
+	if subtle.ConstantTimeCompare([]byte(apiKey), []byte(s.expectedKey)) != 1 {
 		return ErrInvalidAPIKey
 	}
 
