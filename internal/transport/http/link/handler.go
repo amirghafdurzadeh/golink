@@ -3,28 +3,25 @@ package link
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/amirghafdurzadeh/golink/internal/httpx"
+	"github.com/amirghafdurzadeh/golink/internal/link"
+	"github.com/amirghafdurzadeh/golink/internal/transport/http/helper"
 )
 
-type Handler interface {
-	Create(w http.ResponseWriter, r *http.Request)
-	Get(w http.ResponseWriter, r *http.Request)
-	Delete(w http.ResponseWriter, r *http.Request)
+type Handler struct {
+	service link.Service
 }
 
-type handler struct {
-	service Service
-}
-
-func NewHandler(service Service) Handler {
-	return &handler{
+func NewHandler(service link.Service) *Handler {
+	return &Handler{
 		service: service,
 	}
 }
 
-func (h *handler) Create(w http.ResponseWriter, r *http.Request) {
-	var req CreateRequest
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	var req CreateLinkRequest
 
 	if err := httpx.DecodeJSON(r, &req); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
@@ -36,9 +33,9 @@ func (h *handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	link, err := h.service.Create(r.Context(), req.CustomCode, req.TargetURL)
+	l, err := h.service.Create(r.Context(), req.CustomCode, req.TargetURL)
 	if err != nil {
-		if errors.Is(err, ErrCodeAlreadyExists) {
+		if errors.Is(err, link.ErrCodeAlreadyExists) {
 			httpx.WriteError(w, http.StatusConflict, err.Error())
 			return
 		}
@@ -47,19 +44,25 @@ func (h *handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpx.WriteJSON(w, http.StatusCreated, buildCreateResponse(req.BaseURL, link))
+	shortURL := strings.TrimRight(req.BaseURL, "/") + "/r/" + l.Code
+
+	httpx.WriteJSON(w, http.StatusCreated, CreateLinkResponse{
+		Code:      l.Code,
+		ShortURL:  shortURL,
+		TargetURL: l.TargetURL,
+	})
 }
 
-func (h *handler) Get(w http.ResponseWriter, r *http.Request) {
-	code, err := getCodeFromRequest(r)
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+	code, err := helper.MustPathValue(r, "code")
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	link, err := h.service.Get(r.Context(), code)
+	l, err := h.service.Get(r.Context(), code)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, link.ErrNotFound) {
 			httpx.WriteError(w, http.StatusNotFound, err.Error())
 			return
 		}
@@ -68,14 +71,14 @@ func (h *handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpx.WriteJSON(w, http.StatusOK, GetResponse{
-		Code:      link.Code,
-		TargetURL: link.TargetURL,
+	httpx.WriteJSON(w, http.StatusOK, GetLinkResponse{
+		Code:      l.Code,
+		TargetURL: l.TargetURL,
 	})
 }
 
-func (h *handler) Delete(w http.ResponseWriter, r *http.Request) {
-	code, err := getCodeFromRequest(r)
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	code, err := helper.MustPathValue(r, "code")
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -84,7 +87,7 @@ func (h *handler) Delete(w http.ResponseWriter, r *http.Request) {
 	err = h.service.Delete(r.Context(), code)
 	if err != nil {
 
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, link.ErrNotFound) {
 			httpx.WriteError(w, http.StatusNotFound, err.Error())
 			return
 		}

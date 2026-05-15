@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	Environment     string
-	AppPort         string
+	HTTPPort        string
 	PostgresURL     string
 	RedisAddr       string
 	RedisPassword   string
@@ -52,7 +52,7 @@ func Load() (*Config, error) {
 
 	return &Config{
 		Environment:     appEnv,
-		AppPort:         getEnv("APP_PORT", "8080"),
+		HTTPPort:        getEnv("HTTP_PORT", "8080"),
 		PostgresURL:     postgresURL,
 		RedisAddr:       redisAddr,
 		RedisPassword:   getEnv("REDIS_PASSWORD", ""),

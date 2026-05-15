@@ -1,6 +1,9 @@
 package link
 
-import "strings"
+import (
+	"crypto/rand"
+	"math/big"
+)
 
 func buildCode(customCode string, length int) string {
 	if customCode != "" {
@@ -10,12 +13,15 @@ func buildCode(customCode string, length int) string {
 	return generateShortCode(length)
 }
 
-func buildCreateResponse(baseURL string, link Link) CreateResponse {
-	shortURL := strings.TrimRight(baseURL, "/") + "/r/" + link.Code
+func generateShortCode(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-	return CreateResponse{
-		Code:      link.Code,
-		ShortURL:  shortURL,
-		TargetURL: link.TargetURL,
+	b := make([]byte, length)
+
+	for i := range b {
+		n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		b[i] = charset[n.Int64()]
 	}
+
+	return string(b)
 }

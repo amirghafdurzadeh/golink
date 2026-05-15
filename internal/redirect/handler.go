@@ -2,22 +2,16 @@ package redirect
 
 import (
 	"net/http"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler interface {
 	Redirect(w http.ResponseWriter, r *http.Request)
 }
 
-type handler struct {
-	db *pgxpool.Pool
-}
+type handler struct{}
 
-func NewHandler(db *pgxpool.Pool) Handler {
-	return &handler{
-		db: db,
-	}
+func NewHandler() Handler {
+	return &handler{}
 }
 
 // unimplemented

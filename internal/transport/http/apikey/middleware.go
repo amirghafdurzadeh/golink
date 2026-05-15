@@ -2,6 +2,8 @@ package apikey
 
 import (
 	"net/http"
+
+	"github.com/amirghafdurzadeh/golink/internal/apikey"
 )
 
 type Middleware interface {
@@ -9,12 +11,12 @@ type Middleware interface {
 }
 
 type middleware struct {
-	apiKey string
+	service apikey.Service
 }
 
-func NewMiddleware(apiKey string) Middleware {
+func NewMiddleware(service apikey.Service) Middleware {
 	return &middleware{
-		apiKey: apiKey,
+		service: service,
 	}
 }
 
@@ -22,13 +24,8 @@ func (m *middleware) Protect(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		apiKey := r.Header.Get("X-API-Key")
 
-		if apiKey == "" {
-			http.Error(w, "missing api key", http.StatusUnauthorized)
-			return
-		}
-
-		if apiKey != m.apiKey {
-			http.Error(w, "invalid api key", http.StatusUnauthorized)
+		if err := m.service.Validate(apiKey); err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
