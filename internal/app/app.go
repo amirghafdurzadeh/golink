@@ -37,12 +37,12 @@ func New(ctx context.Context) (Application, error) {
 	}
 
 	// infrastructure
-	postgres, err := database.NewPostgres(ctx, cfg.PostgresURL)
+	postgres, err := database.NewPostgres(ctx, cfg.Postgres.URL())
 	if err != nil {
 		return nil, err
 	}
 
-	redis, err := database.NewRedis(ctx, cfg.RedisAddr, cfg.RedisPassword)
+	redis, err := database.NewRedis(ctx, cfg.Redis.Addr(), cfg.Redis.Password)
 	if err != nil {
 		postgres.Close()
 		return nil, err
@@ -55,9 +55,16 @@ func New(ctx context.Context) (Application, error) {
 	linkCache := link.NewRedisCache(redis, 24*time.Hour)
 
 	// services
-	apikeyService := apikey.NewService(cfg.APIKey)
+	apikeyService := apikey.NewService(cfg.App.APIKey)
 	healthService := health.NewService(postgres, redis)
-	linkService := link.NewService(linkRepo, linkCache, cfg.ShortCodeLength)
+	linkService := link.NewService(
+		link.ServiceConfig{
+			BaseURL:         cfg.App.BaseURL,
+			ShortCodeLength: cfg.App.ShortCodeLength,
+		},
+		linkRepo,
+		linkCache,
+	)
 
 	return &application{
 		cfg:      cfg,

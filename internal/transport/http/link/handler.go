@@ -44,7 +44,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL := strings.TrimRight(req.BaseURL, "/") + "/r/" + l.Code
+	shortURL := strings.TrimRight(h.service.GetBaseURL(), "/") + "/r/" + l.Code
 
 	httpx.WriteJSON(w, http.StatusCreated, CreateLinkResponse{
 		Code:      l.Code,

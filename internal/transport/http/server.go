@@ -4,26 +4,26 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"time"
 
 	"github.com/amirghafdurzadeh/golink/internal/app"
+	"github.com/amirghafdurzadeh/golink/internal/config"
 )
 
 type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(ctx context.Context, services app.Services, addr string) *Server {
+func NewServer(ctx context.Context, cfg config.HTTPConfig, services app.Services) *Server {
 	handler := newRouter(services)
 
 	return &Server{
 		httpServer: &http.Server{
-			Addr:              addr,
+			Addr:              ":" + cfg.Port,
 			Handler:           handler,
-			ReadTimeout:       5 * time.Second,
-			ReadHeaderTimeout: 5 * time.Second,
-			WriteTimeout:      10 * time.Second,
-			IdleTimeout:       60 * time.Second,
+			ReadTimeout:       cfg.ReadTimeout,
+			ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+			WriteTimeout:      cfg.WriteTimeout,
+			IdleTimeout:       cfg.IdleTimeout,
 			BaseContext: func(_ net.Listener) context.Context {
 				return ctx
 			},

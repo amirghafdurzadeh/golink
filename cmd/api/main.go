@@ -42,17 +42,14 @@ func buildApplication(ctx context.Context) (app.Application, error) {
 func run(ctx context.Context, application app.Application) error {
 	httpServer := transporthttp.NewServer(
 		ctx,
+		application.Config().HTTP,
 		application.Services(),
-		":"+application.Config().HTTPPort,
 	)
 
 	errCh := make(chan error, 1)
 
 	go func() {
-		log.Printf(
-			"http server started on :%s",
-			application.Config().HTTPPort,
-		)
+		log.Printf("http server started on :%s", application.Config().HTTP.Port)
 
 		if err := httpServer.Start(); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
